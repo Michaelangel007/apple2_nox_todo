@@ -1,4 +1,9 @@
-
+; Show DHGR Logo
+;
+; References:
+;   Apple IIe #3
+;   Double High-Resolution Graphics
+;   * http://www.1000bit.it/support/manuali/apple/technotes/aiie/tn.aiie.03.html
 
 MOV_SRC     = $003C ; A1L
 MOV_END     = $003E ; A2L
@@ -26,8 +31,10 @@ HGR         = $C057
 AN3         = $C05E
 
 
+; ========================================
         ORG $1F80
 
+; Main
         STA STORE80
         STA RDMAINRAM
         STA WRMAINRAM
@@ -83,6 +90,8 @@ WaitForKey
         RTS
 
         DS \,$00
+
+; ========================================
 
         PUTBIN logo.dhgr
 
