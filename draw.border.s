@@ -22,7 +22,7 @@ KEY         = $C000
 KEYSTROBE   = $C010
 
 SW_STORE80  = $C000 ; Off allow SW_AUXRDOFF/etc
-SW_STORE81  = $C001 ; $C055 = page 2, 
+SW_STORE81  = $C001 ; $C055 = page 2
 
 RDMAINRAM   = $C002 ; 2=OFF, 3=ON
 WRMAINRAM   = $C004
@@ -96,8 +96,8 @@ State1
         JSR PutHgrMain
         LDY #$4E/2      ; Col F
         LDA #$22        ; pixel: magenta
-        JSR PutHgrAux  
- 
+        JSR PutHgrAux
+
 ; Border Inside
         LDY zRow1
         CPY #$9
@@ -111,8 +111,8 @@ State1
         JSR PutHgrMain
         INY             ; Col D
         LDA #$0C        ; pixel: orange
-        JSR PutHgrAux 
-      
+        JSR PutHgrAux
+
 ; Scanline Row 2
 Scan2a
         LDY zRow2
@@ -140,14 +140,15 @@ Scan2a
         JSR PutHgrMain
         INY             ; Col D
         LDA #$0C        ; pixel: orange
-        JSR PutHgrAux 
+        JSR PutHgrAux
 
 Scan3a
         DEC zRow1
         INC zRow2
 
 NoDelay
-        JSR Delay       ; *** SELF-MODIFIED
+        JSR Delay
+
         CLC
         BCC State1      ; always
 
@@ -226,6 +227,8 @@ DrawTopBotOuterLines
         INC zCol1
         DEC zCol2
 
+        JSR Delay
+
         LDA zCol1
         CMP #$28
         BNE DrawTopBotInnerLines
@@ -235,6 +238,8 @@ DrawTopBotOuterLines
 State3
 
 ; ==========
+SkipAnim
+
         STA WRMAINRAM
 Loop
         LDA KEY
@@ -264,8 +269,12 @@ ZeroPage
         BNE ZeroPage
         RTS
 
+
 ; ==========
 Delay
+        LDX KEY
+        BMI _Delay2
+
         LDX #13
 _Delay
         JSR DelayVSync
@@ -282,7 +291,9 @@ DelayVSync
 DelayDraw
         LDA RDVBL
         BPL DelayVSync
+_Delay2
         RTS
+
 
 ; ==========
 Draw3Lines
