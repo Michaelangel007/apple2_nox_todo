@@ -128,7 +128,7 @@ Scan2a
 
 ; Border Inside
         LDY zRow2
-        CPY #$B6
+        CPY #$B7
         BCS Scan3a
 
         LDY #1          ; Col B
@@ -169,6 +169,7 @@ State2
         BNE DrawTopBotOuterLines
 
 DrawTopBotInnerLines
+
         CLC
         LDA zRow1
         ADC #5
@@ -179,9 +180,11 @@ DrawTopBotInnerLines
         LDX zCol1
         JSR Draw3Lines
 
-        SEC             ; Orange
         LDY zRowPix2
         LDX zCol2
+        CPX #$4C        ; HACK: Skip end orange byte
+        BEQ DrawTopBotOuterLines
+        SEC             ; Orange
         JSR Draw3Lines
 
         SEC
