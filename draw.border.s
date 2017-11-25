@@ -258,6 +258,7 @@ ZeroHGR12
         LDY #0
         TYA
         STA zKey
+;       JSR HaveKey
         STY GBASL
 ZeroPage
         STA (GBASL),Y
@@ -295,6 +296,9 @@ _Delay2
         RTS
 
 
+; A = 0/1 which colors: magenta/orange
+; X = Column
+; Y = Row
 ; ==========
 Draw3Lines
         LDA #0
