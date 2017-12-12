@@ -1,37 +1,22 @@
-all: bin/gap temp \
-	temp/logo_split_a temp/logo_split_a.gap temp/logo_split_a.gap.lz4 \
-	                  temp/logo_split_b.gap temp/logo_split_b.gap.lz4 \
-	nox.logo
+#TARGET=draw.border3
+#SOURCE=draw.border3.s
+
+TARGET=draw.border4
+SOURCE=draw.border4.s
+
+all: $(TARGET)
 
 clean:
-	$(RM) -f bin/gap temp/* nox.logo
+	$(RM) $(TARGET)
 
-bin/gap: util/gap.cpp
-	g++ $< -o $@
-
-temp:
-	mkdir temp
-
-# NOTE: Also produces temp/logo_split_b
-temp/logo_split_a: temp
-	split -a 1 -b 8192 logo.dhgr temp/logo_split_
-
-temp/logo_split_a.gap:temp/logo_split_a
-	bin/gap temp/logo_split_a
-
-temp/logo_split_b.gap:temp/logo_split_b
-	bin/gap temp/logo_split_b
-
-temp/logo_split_a.gap.lz4: temp temp/logo_split_a.gap
-	bin/lz4 temp/logo_split_a.gap
-
-temp/logo_split_b.gap.lz4: temp temp/logo_split_b.gap
-	bin/lz4 temp/logo_split_b.gap
-
-nox.logo: nox.logo.s temp/logo_split_a.gap.lz4 temp/logo_split_b.gap.lz4
+# https://stackoverflow.com/questions/1320226/four-dollar-signs-in-makefile
+$(TARGET): $(SOURCE)
 	merlin32 $<
+	merlin2symbols $(TARGET)_Output.txt > $(TARGET).symbols
+	prodos border.po init -size=140 /BORDER prodos border.po init -size=140 /BORDER
+	prodos border.po cp -access=\$$E3 -type=BIN -aux=\$$6000 DRAW.BORDER4 /
+	prodos border.po cp -access=\$$E3 -type=BIN -aux=\$$6000 LOGO.DHGR /
+#	prodos border.po cp -access=\$$E3 -type=BIN -aux=\$$0900 ../apple2_hgrbyte/bin/dhgr.byte /
+	prodos border.po catalog
 
-#
-# AppleWin Debugger: BLOAD NOX.LOGO,6000
-# ProDOS/Basic:      BSAVE NOX.LOGO,A$6000,L$2977
 
