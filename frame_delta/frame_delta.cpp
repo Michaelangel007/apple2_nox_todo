@@ -122,9 +122,11 @@ printf( "; *** INFO.*** Closing span on last column\n" );
     // Do span processing
     if( !gbCompiledSprite && nSpans )
     {
-        // Negative = Now SW_AUXWROFF
+        // Negative = switch to write main memory via SW_AUXWROFF
         // 0 == End-of-Data
-        printf( "        db %d, $%02X\n", isMain ? -nSpans : nSpans, (base >> 8) &0xFF );
+
+//      printf( "        db %d, $%02X\n", isMain ? -nSpans : nSpans, (base >> 8) &0xFF );
+        printf( "        db %2d               ; Spans @ $%02Xxx\n", isMain ? -nSpans : nSpans, (base >> 8) &0xFF  );
 
         printf( "        db " );
         for( int iSpan = 0; iSpan < nSpans; iSpan++ )
@@ -135,13 +137,10 @@ printf( "; *** INFO.*** Closing span on last column\n" );
         for( int iSpan = 0; iSpan < nSpans; iSpan++ )
             printf( "$%02X,", aSpanVal[ iSpan ] & 0xFF );
         printf( " ; val\n" );
-
     }
 
-
-
     return nSpans
-        ? 2 + nSpans*2 // 2 byte header, <key,val> per span
+        ? 1 + nSpans*2 // 1 byte header, <key,val> per span
         : 0
         ;
 }
@@ -187,20 +186,28 @@ void delta( const uint8_t *frame1, const uint8_t *frame2, int page )
     // Main
     printf( "; === Main ===\n" );
     if( gbCompiledSprite )
-        printf( "        sta $c004          ; AUXWROFF\n" );
+        printf( "        sta $c004           ; AUXWROFF\n" );
 
     for( iAddr = _8K; iAddr < _16K; iAddr += 256 )
         nBytesM += find_spans( frame1 + iAddr, frame2 + iAddr, iPage + iAddr - _8K, (iAddr == _8K) );
 
     if( gbCompiledSprite )
+    {
         printf( "        rts\n" );
+        nBytesZ += 1;
+    }
     else
     if( nSpans )
         if( gbAppendSentinel )
-        printf( "        db 0\n" ); // end of data
+        {
+            printf( "        db 0\n" ); // end of data
+            nBytesZ++;
+        }
 
     printf( "; Total Bytes Aux.: %d\n", nBytesA );
     printf( "; Total Bytes Main: %d\n", nBytesM );
+    printf( "; Total Bytes Misc: %d\n", nBytesZ );
+    printf( ";================== %d\n", nBytesA + nBytesM + nBytesZ );
 }
 
 
