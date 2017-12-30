@@ -214,7 +214,16 @@ void delta( const uint8_t *frame1, const uint8_t *frame2, int page )
 // ========================================================================
 int usage()
 {
-    printf( "USAGE: frame_delta <pic1.dhgr> <pic2.dhgr> <hgrpage>\n" );
+    printf( "USAGE: frame_delta <pic1.dhgr> <pic2.dhgr> <hgrpage> [-compile]\n" );
+    printf( "\n" );
+    printf( "Generate two data tables:\n" );
+    printf( " * one for changed aux bytes\n" );
+    printf( " * one for changed main bytes\n" );
+    printf( "\n" );
+    printf( "Use -compile to instead generate 6502 assembly code\n" );
+    printf( "to draw the sprite at a fixed location.\n" );
+    printf( "This is a compiled sprite.\n" );
+
     return 1;
 }
 
