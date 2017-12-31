@@ -125,18 +125,23 @@ printf( "; *** INFO.*** Closing span on last column\n" );
         // Negative = switch to write main memory via SW_AUXWROFF
         // 0 == End-of-Data
 
-//      printf( "        db %d, $%02X\n", isMain ? -nSpans : nSpans, (base >> 8) &0xFF );
-        printf( "        db %2d               ; Spans @ $%02Xxx\n", isMain ? -nSpans : nSpans, (base >> 8) &0xFF  );
+        // 1-s compliment to avoid N+1 on 6502 Sprite Compiler/Parser
+        printf( "        db %2d               ; Spans @ $%02Xxx\n", isMain ? ~nSpans : nSpans, (base >> 8) &0xFF  );
 
-        printf( "        db " );
+        // Interleave byte,addr so that sprite compiler can emit code in sequential order
+        //    JSR EmitByteA9
+        //    JSR FetchByte    <--
+        //    JSR EmitByteImm
+        //    JSR EmitByte8D
+        //    JSR FetchByte    <--
+        //    JSR EmitByteImm
+        //    JSR EmitBytePage
         for( int iSpan = 0; iSpan < nSpans; iSpan++ )
-            printf( "$%02X,", aSpanAdr[ iSpan ] & 0xFF );
-        printf( " ; key\n" );
-
-        printf( "        db " );
-        for( int iSpan = 0; iSpan < nSpans; iSpan++ )
-            printf( "$%02X,", aSpanVal[ iSpan ] & 0xFF );
-        printf( " ; val\n" );
+        {
+            printf( "            db " );
+            printf( "$%02X, ", aSpanVal[ iSpan ] & 0xFF );
+            printf( "$%02X\n", aSpanAdr[ iSpan ] & 0xFF );
+        }
     }
 
     return nSpans
