@@ -144,9 +144,14 @@ printf( "; *** INFO.*** Closing span on last column\n" );
         }
     }
 
-    return nSpans
-        ? 1 + nSpans*2 // 1 byte header, <key,val> per span
+    int nBytes = nSpans
+        ? 1 + nSpans*2  // 1 byte header, <key,val> per span
         : 0
+        ;
+
+    return gbCompiledSprite
+        ? nSpans*5      // 5 bytes = LDA #id (2) + STA $abs (3)
+        : nBytes
         ;
 }
 
@@ -191,7 +196,10 @@ void delta( const uint8_t *frame1, const uint8_t *frame2, int page )
     // Main
     printf( "; === Main ===\n" );
     if( gbCompiledSprite )
+    {
         printf( "        sta $c004           ; AUXWROFF\n" );
+        nBytesZ += 3;
+    }
 
     for( iAddr = _8K; iAddr < _16K; iAddr += 256 )
         nBytesM += find_spans( frame1 + iAddr, frame2 + iAddr, iPage + iAddr - _8K, (iAddr == _8K) );
@@ -209,10 +217,11 @@ void delta( const uint8_t *frame1, const uint8_t *frame2, int page )
             nBytesZ++;
         }
 
-    printf( "; Total Bytes Aux.: %d\n", nBytesA );
-    printf( "; Total Bytes Main: %d\n", nBytesM );
-    printf( "; Total Bytes Misc: %d\n", nBytesZ );
-    printf( ";================== %d\n", nBytesA + nBytesM + nBytesZ );
+    int nTotal = nBytesA + nBytesM + nBytesZ;
+    printf( "; Total Bytes Aux.: $%04X (%d)\n", nBytesA, nBytesA );
+    printf( "; Total Bytes Main: $%04X (%d)\n", nBytesM, nBytesM );
+    printf( "; Total Bytes Misc: $%04X (%d)\n", nBytesZ, nBytesZ );
+    printf( ";================== $%04X (%d)\n", nTotal , nTotal  );
 }
 
 
