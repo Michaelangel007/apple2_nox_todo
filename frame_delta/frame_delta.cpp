@@ -126,7 +126,7 @@ printf( "; *** INFO.*** Closing span on last column\n" );
 #endif
 
     // Do span processing
-    if( !gbCompiledSprite && nSpans )
+    if( !gbCompiledSprite )
     {
         // 0   Zero     = End-of-Data
         // <0  Negative = Tell sprite compiler that we need to switch from writing AUX memory to MAIN memory via emitting SW_AUXWROFF
@@ -142,13 +142,20 @@ printf( "; *** INFO.*** Closing span on last column\n" );
         //          UnpackSpans
         //              :
         //          Done
-        printf( "        db %3d %s        ; Spans @ $%02Xxx\n"
-            , nSpans
-            , isMain
-            ? "+ $80"
-            : "     "
-            , (base >> 8) &0xFF
-        );
+        if( !nSpans )
+            printf( "        db %3d %s        ; SKIP  @ $%02Xxx\n"
+                , nSpans
+                , "+ $C0"
+                , (base >> 8) &0xFF
+            );
+        else
+            printf( "        db %3d %s        ; Spans @ $%02Xxx\n"
+                , nSpans
+                , isMain
+                ? "+ $80"
+                : "     "
+                , (base >> 8) &0xFF
+            );
 
         // Interleave byte,addr so that sprite compiler can emit code in sequential order
         //    JSR EmitByteA9
