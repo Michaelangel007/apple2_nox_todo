@@ -9,6 +9,7 @@ Usage:
 
     Default is: -data
 */
+#define DEBUG 0
 
 // Includes
     #include <stdio.h>  // printf()
@@ -86,6 +87,9 @@ int find_spans( const uint8_t *frame1, const uint8_t *frame2, int base, bool isM
                         aSpanVal[ nSpans ] = frame2[ offset + edge ]; // val
                         aSpanLen[ nSpans ] = 1;
 
+#if DEBUG
+    printf( "; nSpan = %d, Val = %02X, Addr = %04X\n", nSpans, aSpanVal[ nSpans ], aSpanAdr[ nSpans ] );
+#endif
                         if( gbCompiledSprite )
                         {
                             printf( "        LDA #$%02X\n", aSpanVal[ nSpans ] );
