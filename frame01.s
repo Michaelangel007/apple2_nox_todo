@@ -6,71 +6,72 @@
         db $20              ; Base Address
         db   2              ; Spans @ $20xx
             db $20, $6F
-            db $08, $EF
+            db $20, $EF
         db   1              ; Spans @ $21xx
             db $08, $58
         db   2              ; Spans @ $22xx
-            db $08, $2F
-            db $08, $D7
+            db $60, $2F
+            db $20, $D7
         db   2              ; Spans @ $23xx
-            db $08, $57
+            db $60, $57
             db $20, $C7
         db   1              ; Spans @ $24xx
-            db $08, $6F
+            db $20, $6F
         db   1              ; Spans @ $25xx
             db $08, $58
         db   2              ; Spans @ $26xx
-            db $08, $2F
-            db $08, $D7
+            db $60, $2F
+            db $60, $D7
         db   2              ; Spans @ $27xx
-            db $08, $57
+            db $60, $57
             db $20, $C7
         db   1              ; Spans @ $28xx
-            db $08, $6F
+            db $22, $6F
+        db   0 + $C0        ; SKIP  @ $29xx
         db   2              ; Spans @ $2Axx
-            db $08, $2F
-            db $08, $D7
+            db $60, $2F
+            db $70, $D7
         db   2              ; Spans @ $2Bxx
-            db $08, $57
+            db $60, $57
             db $20, $C7
         db   1              ; Spans @ $2Cxx
-            db $08, $6F
+            db $62, $6F
         db   2              ; Spans @ $2Dxx
             db $08, $B0
             db $08, $D8
         db   2              ; Spans @ $2Exx
-            db $08, $2F
-            db $08, $D7
+            db $60, $2F
+            db $20, $D7
         db   1              ; Spans @ $2Fxx
             db $20, $C7
         db   2              ; Spans @ $30xx
-            db $09, $6F
+            db $62, $6F
             db $08, $D8
         db   2              ; Spans @ $31xx
-            db $08, $AF
+            db $20, $AF
             db $08, $D8
         db   2              ; Spans @ $32xx
-            db $08, $2F
+            db $20, $2F
             db $08, $D8
         db   1              ; Spans @ $33xx
             db $20, $C7
         db   2              ; Spans @ $34xx
-            db $08, $6F
+            db $62, $6F
             db $08, $D8
         db   2              ; Spans @ $35xx
-            db $08, $AF
+            db $20, $AF
             db $08, $D8
         db   3              ; Spans @ $36xx
             db $20, $2F
             db $20, $57
-            db $08, $D7
+            db $20, $D7
         db   1              ; Spans @ $37xx
             db $20, $C7
         db   2              ; Spans @ $38xx
-            db $08, $6F
+            db $22, $6F
             db $08, $D8
         db   2              ; Spans @ $39xx
-            db $08, $AF
+            db $60, $AF
             db $08, $D8
         db   2              ; Spans @ $3Axx
             db $20, $57
@@ -78,14 +79,14 @@
         db   1              ; Spans @ $3Bxx
             db $20, $C7
         db   2              ; Spans @ $3Cxx
-            db $08, $6F
+            db $20, $6F
             db $08, $D8
         db   2              ; Spans @ $3Dxx
-            db $08, $AF
+            db $60, $AF
             db $09, $D8
         db   2              ; Spans @ $3Exx
             db $20, $57
-            db $08, $D7
+            db $60, $D7
         db   1              ; Spans @ $3Fxx
             db $20, $C7
 ; === Main ===

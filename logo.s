@@ -4,25 +4,39 @@
 ; DHGR Screen Difference to Compiled Sprite
 ; Frame Delta
 
+CONFIG_DEBUG = 1
 
-GBASL       = $26   ; 16-bit pointer to start of D/HGR scanline
-GBASH       = $27
+SpriteLogo_RELOC  = $0200 ; $F6 bytes used
+SpriteTitle_RELOC = $D000
 
-GBAS2       = $28   ; pointer to opposite DHGR page
+; ZP Table of Compiled Delta Frame Function Address
+aFrameFunc        = $0000 ; 2 bytes/entry, odd = func resides in AUX mem
 
-MOV_SRC     = $003C ; A1L
-MOV_END     = $003E ; A2L
-MOV_DST     = $0042 ; A4L
+; enum DHGR Frames
+; NOTE: *MUST* keep in SYNC TableDeltaAuxInit and FRAME_BLOOD_*
+FRAME_BLOOD_01  = $00
+FRAME_BLOOD_02  = $01
+FRAME_BLOOD_13  = $02
+FRAME_BLOOD_24  = $03
+FRAME_BLOOD_31  = $04
+FRAME_BLOOD_42  = $05
+FRAME_CROWN_13  = $06
+FRAME_CROWN_24  = $07
+FRAME_CROWN_31  = $08
+FRAME_CROWN_42  = $09
+FRAME_EYES_13   = $0A
+FRAME_EYES_24   = $0B
+FRAME_EYES_31   = $0C
+FRAME_EYES_42   = $0D
+_NUM_FRAME      = $0E
 
+; ZP variables *must* come after DrawDeltaFrame on ZP !
+HGR_PAGE    = $E6
+zTimer      = $E8
 
-zMemCopy    = $E0              ; memcpy() at ZP to generate small INC SRC and INC DST pointer code!
-MoveSrc     = zMemCopy + 1     ; LDA $abs
-MoveDst     = zMemCopy + 1 + 3 ; LDA $abs
-
-HGR_PAGE    = $E2
-
-;zKey        = $F0   ; cached key press
-zTimer      = $F0
+GBASL       = $EA   ; 16-bit pointer to start of D/HGR scanline
+GBASH       = $EB
+GBAS2       = $EC   ; pointer to opposite DHGR page
 
 zDstX       = $EE   ; Sprite Dest X
 zSaveY      = $EF
@@ -31,37 +45,6 @@ zSpriteY    = $F1
 zSpriteW    = $F2   ; end col
 zSpriteH    = $F3   ; rows remaining
 zSpritePtr  = $F4 ; SPRITE: 16-bit poiter
-
-; Compile Sprite Data -> Code
-zSpriteSrc  = $F6 ; Mirror of zSpritePtr for reading key/val pairs
-zSpriteDst  = $F8 ;
-zSpritePage = $FA ; Dest Page = Screen Address of Sprite, i.e. $20
-zSpriteTemp = $FB ; Mirror of zSpritePage for aux/main switch
-zSpriteNext = $FC ; Array of Function Pointers, next address to write to
-
-UNPACK_SPRITES = 1
-CROWN_EYES     = 1
-
-SpriteLogo_RELOC  = $0100
-SpriteTitle_RELOC = $D000
-Crown13_RELOC     = $0CBA ; + $F25 = $1BDF
-
-SPRITE_FUNC = $800 ; 2 bytes/entry ; NOTE: Intentional over-write bottom of stack! (Can change to start-of-program if needed)
-; DHGR Frames
-BLOOD_13 = 2*$00
-BLOOD_24 = 2*$01
-BLOOD_31 = 2*$02
-BLOOD_42 = 2*$03
-BLOOD_1  = 2*$04
-BLOOD_2  = 2*$05
-CROWN_13 = 2*$06
-CROWN_24 = 2*$07
-CROWN_31 = 2*$08
-CROWN_42 = 2*$09
-EYES_13  = 2*$0A
-EYES_24  = 2*$0B
-EYES_31  = 2*$0C
-EYES_42  = 2*$0D
 
 zPix        = $F6 ; BYTE: Color to write
 zColors     = $F7 ; FLAG: Pixels1 or Pixels2
@@ -75,7 +58,7 @@ zRow1       = $FD ; middle->top
 zRow2       = $FE ; middle->bot
 zIntroState = $FF
 
-aHgrYLo     = $200 ; 16-bit pointer start scan line - low byte
+aHgrYLo     = $100 ; 16-bit pointer start scan line - low byte, only $C0 bytes used on STACK
 aHgrYHi     = $300 ; 16-bit pointer start scan line - high byte
 
 KEY         = $C000
@@ -128,205 +111,57 @@ LCBANK1     = $C08B ; Bank 1 | Bank 1 | yes
         ORG $0800
 
 Main
-        STA SW_AUXWROFF
-        STA SETSTDZP
+        JSR Init
+
+; Intentional copy into STACK PAGE!
+        LDX #0                     ; Copy $100 bytes
+CopyCodeToZP
+        LDA __code_zp_src ,X       ;
+        STA __reloc_zp_dst,X       ; ZP,X does NOT roll over into STACK Page
+        INX
+        BNE CopyCodeToZP
+
         JSR MakeHgrTables
 
-; Since the SpriteLogo is $F6 bytes
-; we copy the SpriteLogo to the stack page!
-; This means we RTS to [$00FE] = $0000 --> $0001
-        LDA #$4C                ; JMP $abs
-        LDX #>_DoneLogoSprite
-        LDY #<_DoneLogoSprite
-        STA $01
-        STY $02
-        STX $03
-        LDX #$FF                ; Reset stack
-        TXS
+InitLogoSprite
+        LDX #>SpriteLogo            ; SrcPage
+        LDY #>SpriteLogo_RELOC      ; DstPage
+        LDA #>_sprite_logo_len+256  ; LenPage
+        JSR MemMoveLC
 
-_InitLogoSprite
-        LDX #>SpriteLogo        ; SrcPage
-        LDY #>SpriteLogo_RELOC  ; DstPage
-        LDA #>_sprite_logo_len  ; LenPage
-        JSR MoveSprite
 
-_DoneLogoSprite
+; Boot sector reads ProRWTS2 into $D000-D8FF Main LC Bank1
+; NOXARCH.MAIN read LOADER.P
+; moves ProRWTS2 to Aux LC Bank 1.
 
-_InitTitleSprite
-        LDA LCBANK1             ; $D000 BANK 1
-        LDA LCBANK1
-        LDX #>SpriteTitle       ; SrcPage
-        LDY #>SpriteTitle_RELOC ; DstPage
-        LDA #>_sprite_title_len ; LenPage
-        JSR MoveSprite
-
-    DO UNPACK_SPRITES
-
-        LDA LCBANK2     ; Use Bank 2 $D000
+InitTitleSprite
+        LDA LCBANK2             ; $D000 BANK 2
         LDA LCBANK2
-        STA SETALTZP    ; AUX Bank 2 $D000
+        LDX #>SpriteTitle           ; SrcPage = $5096
+        LDY #>SpriteTitle_RELOC     ; DstPage = $D000
+        LDA #>_sprite_title_len+256 ; LenPage = $5F54 - $5096 = $0F
+        JSR MemMoveLC
 
-UnpackSprites
+
+; Unpack the sprites or compiled delta frames
+; Parse the Table of Compiled Frames that live in AUX mem
+
+        LDA #0
+        STA $400        ; DEBUG
 
 ; === Blood ===
-
-        LDX #$D0
-        LDY #$00
-        JSR InitCompileSpriteDest
-
-        LDA #BLOOD_13       ; @ $D000
-        LDX #>blood1delta3
-        LDY #<blood1delta3
-        JSR CompileSprite
-
-    LDA #"."
-    STA $400
-
-        LDA #BLOOD_24       ; @ $D5A2
-        LDX #>blood2delta4
-        LDY #<blood2delta4
-        JSR CompileSprite
-
-    LDA #"."
-    STA $401
-
-        LDA #BLOOD_31       ; @ $DB3F
-        LDX #>blood3delta1
-        LDY #<blood3delta1
-        JSR CompileSprite
-
-    LDA #"."
-    STA $402
-
-        LDA #BLOOD_42       ; @ $E0E1
-        LDX #>blood4delta2
-        LDY #<blood4delta2
-        JSR CompileSprite
-
-    LDA #"."
-    STA $403
-
-        LDA #BLOOD_1        ; @ $E67E
-        LDX #>frame1delta0
-        LDY #<frame1delta0
-        JSR CompileSprite
-
-    LDA #"."
-    STA $404
-
-        LDA #BLOOD_2        ; @ $E900
-        LDX #>frame2delta0
-        LDY #<frame2delta0
-        JSR CompileSprite
-                            ; @ $EC44 ends
-
-    LDA #"."
-    STA $405
-
-; Safe to over-write/re-use packed blood data
-
-        LDX #>Crown13_RELOC
-        LDY #<Crown13_RELOC
-        JSR InitCompileSpriteDest
-
-        LDA #CROWN_13       ; @ $0E00 (was $EC45)
-        LDX #>crown1delta3
-        LDY #<crown1delta3
-        JSR CompileSprite   ; Size = $101F, (was Next @ $FC64)
-
-
-    DO CROWN_EYES
-
 ; === Crown ===
-
-        STA SETSTDZP    ; MAIN Bank 2 $D000
-
-        LDX #$D0
-        LDY #$00
-        JSR InitCompileSpriteDest
-
-    LDA #"."
-    STA $500
-
-        LDA #CROWN_24       ; @ $D000
-        LDX #>crown2delta4
-        LDY #<crown2delta4
-        JSR CompileSprite
-
-    LDA #"."
-    STA $501
-
-        LDA #CROWN_31       ; @ $DF25
-        LDX #>crown3delta1
-        LDY #<crown3delta1
-        JSR CompileSprite
-
-    LDA #"."
-    STA $502
-
-        LDA #CROWN_42       ; @ $EF44
-        LDX #>crown4delta2
-        LDY #<crown4delta2
-        JSR CompileSprite   ; Size = $F25, Next @ $FE69
-
-    LDA #"."
-    STA $503
-
+        LDX #>TableDeltaAuxInit
+        LDY #<TableDeltaAuxInit
+        JSR TableUnpack
 
 ; === Eyes ===
 
-        LDA LCBANK1
-        LDA LCBANK1
-; Now fill main 48K with compiled sprite data
-; since LC Banks 1 & 2 don't have any more room
-; for another compiled sprites
-
-        LDX #>__code_end
-        LDY #<__code_end
-        JSR InitCompileSpriteDest
-
-        LDA #EYES_13        ; $7ACE
-        LDX #>eye1delta3
-        LDY #<eye1delta3
-        JSR CompileSprite
-
-    LDA #"."
-    STA $600
-
-        LDA #EYES_24        ; $8C69
-        LDX #>eye2delta4
-        LDY #<eye2delta4
-        JSR CompileSprite
-
-    LDA #"."
-    STA $601
-
-        LDA #EYES_31        ; $9D14
-        LDX #>eye3delta1
-        LDY #<eye3delta1
-        JSR CompileSprite
-
-    LDA #"."
-    STA $602
-
-        LDA #BLOOD_42       ; $AEAF
-        LDX #>eye4delta2
-        LDY #<eye4delta2
-        JSR CompileSprite   ; Len = $, Next @ $BF5A
-
-    LDA #"."
-    STA $603
-
-; CROWN_EYES
-    FIN 
-
-; UNPACK_SPRITES
-    FIN
+        LDX #>TableDeltaMainInit
+        LDY #<TableDeltaMainInit
+        JSR TableUnpack
 
         LDA RAMIN2
-
-;       JSR InitMemCopy
-Init
         STA SW_STORE80  ; Allow to access AUX via WRMAINRAM
 
         STA SW_AUXWRON  ; AUX
@@ -519,10 +354,11 @@ State3a
         LDA #$20            ; JSR $abs - delay after drawing every scanline
         STA SpriteDelay
 
-        LDA RAMIN1          ; $D000 Bank 1
+;       LDA RAMIN1          ; $D000 Bank 1
 
         LDX #>SpriteTitle_RELOC
         LDY #<SpriteTitle_RELOC
+DrawTitle1
         JSR DrawSprite      ; draw on page 1
 
         LDA #$2C            ; bit $abs - no delay drawing
@@ -532,9 +368,10 @@ State3a
         STA HGR_PAGE
         LDX #>SpriteTitle_RELOC
         LDY #<SpriteTitle_RELOC
+DrawTitle2
         JSR DrawSprite      ; draw on page 2
 
-        LDA RAMIN2          ; $D000 Bank 2
+;       LDA RAMIN2          ; $D000 Bank 2
 
 ; Draw Logo
 ; ==========
@@ -561,24 +398,17 @@ State4
 ; Draw Frame 1 Page 1
         JSR Delay
 
-    DO UNPACK_SPRITES
-        STA SETALTZP    ; AUX Bank 2 $D000
-        LDA #BLOOD_1        ; frame1delta0
-        JSR DrawCompiledSprite
-    ELSE
-        JSR frame1delta0
-    FIN
+DrawBlood01
+        LDA #FRAME_BLOOD_01 ; frame1delta0
+        JSR DrawDeltaFrame
         STA SW_PAGE1
 
 ; Draw Frame 2 Page 2
         JSR Delay
 
-    DO UNPACK_SPRITES
-        LDA #BLOOD_2        ; frame2delta0
-        JSR DrawCompiledSprite
-    ELSE
-        JSR frame2delta0
-    FIN
+DrawBlood02
+        LDA #FRAME_BLOOD_02 ; frame2delta0
+        JSR DrawDeltaFrame
         STA SW_PAGE2
 
 ; Animate blood
@@ -591,53 +421,37 @@ State5
 ; Page 1 - Frame 3
         JSR Delay
 
-        LDX #BLOOD_31
-    DO UNPACK_SPRITES
-        JSR DrawCompiledSprite  ; blood3delta1
-    ELSE
-        JSR blood3delta1
-    FIN
+        LDA #FRAME_BLOOD_31
+        JSR DrawDeltaFrame  ; blood3delta1
         STA SW_PAGE1
         JSR BloodWait
         BCS Loop
 
 ; Page 2 - Frame 4
         JSR Delay
-        LDX #BLOOD_42
-    DO UNPACK_SPRITES
-        JSR DrawCompiledSprite   ; blood4delta2
-    ELSE
-        JSR blood4delta2
-    FIN
+        LDA #FRAME_BLOOD_42
+        JSR DrawDeltaFrame  ; blood4delta2
         STA SW_PAGE2
         JSR BloodWait
         BCS Loop
 
 ; Page 1 - Frame 1
         JSR Delay
-        LDX #BLOOD_13
-    DO UNPACK_SPRITES
-        JSR DrawCompiledSprite  ; blood1delta3
-    ELSE
-        JSR blood1delta3
-    FIN
+        LDA #FRAME_BLOOD_13
+        JSR DrawDeltaFrame  ; blood1delta3
         STA SW_PAGE1
         JSR BloodWait
         BCS Loop
 
 ; Page 2 - Frame 2
         JSR Delay
-        LDX #BLOOD_24
-    DO UNPACK_SPRITES
-        JSR DrawCompiledSprite  ; blood2delta4
-    ELSE
-        JSR blood2delta4
-    FIN
+        LDA #FRAME_BLOOD_24
+        JSR DrawDeltaFrame  ; blood2delta4
         STA SW_PAGE2
         JSR BloodWait
         BCS Loop
 
-        JSR Delay
+;       JSR Delay
         INC zTimer+0
         LDA zTimer+0
         CMP #3
@@ -667,84 +481,110 @@ Loop
 ; ==========
 
 State6
-        LDX #>Crown1        ; @ $60BE
+        LDX #>Crown1        ; @ $6000
         LDY #<Crown1
         JSR DrawSprite      ; draw on page 1
         STA SW_PAGE1
 
         LDA #$40
         STA HGR_PAGE
-        LDX #>Crown2        ; @ $6D82
+        LDX #>Crown2        ; @ $6CC4
         LDY #<Crown2
         JSR DrawSprite      ; draw on page 2
 
 ; Animate crown
-; ==========
+; =============
 
         LDA #0
         STA zTimer+0
 
 State7
 
-    DO CROWN_EYES
 ; Page 1 - Frame 3
         JSR Delay
-
-    DO UNPACK_SPRITES
-        LDX #CROWN_31
-        LDA LCBANK1
-        LDA LCBANK1
-        JSR DrawCompiledSprite
-    ELSE
-        JSR crown3delta1
-    FIN
+        LDA #FRAME_CROWN_31
+        JSR DrawDeltaFrame  ; crown3delta1
         STA SW_PAGE1
         JSR BloodWait
         BCS Loop
 
 ; Page 2 - Frame 4
         JSR Delay
-    DO UNPACK_SPRITES
-        LDX #CROWN_42           ; @ $EF44 MAIN Bank 2
-        JSR DrawCompiledSprite
-    ELSE
-        JSR crown4delta2
-    FIN
+        LDA #FRAME_CROWN_42
+        JSR DrawDeltaFrame  ; crown4delta2
         STA SW_PAGE2
         JSR BloodWait
         BCS Loop
 
 ; Page 1 - Frame 1
         JSR Delay
-    DO UNPACK_SPRITES
-        JSR Crown13_RELOC
-    ELSE
-        JSR crown1delta3
-    FIN
+        LDA #FRAME_CROWN_13
+        JSR DrawDeltaFrame  ; crown1delta3
         STA SW_PAGE1
         JSR BloodWait
         BCS Loop
 
 ; Page 2 - Frame 2
         JSR Delay
-    DO  UNPACK_SPRITES
-        LDX #CROWN_24
-        JSR DrawCompiledSprite
-    ELSE
-        JSR crown2delta4
-    FIN
-
+        LDA #FRAME_CROWN_24
+        JSR DrawDeltaFrame  ; crown2delta4
         STA SW_PAGE2
         JSR BloodWait
         BCS Loop
 
-        JSR Delay
+;       JSR Delay
         INC zTimer+0
         LDA zTimer+0
         CMP #3
         BNE State7
-    FIN ; CROWN_EYES
 
+
+
+; Animate eyes
+; ============
+
+        LDA #0
+        STA zTimer+0
+
+State8
+; Page 1 - Frame 3
+        JSR Delay
+        LDA #FRAME_EYES_31
+        JSR DrawDeltaFrame  ; eyes3delta1
+        STA SW_PAGE1
+        JSR BloodWait
+        BCS HaveKey2
+
+; Page 2 - Frame 4
+        JSR Delay
+        LDA #FRAME_EYES_42
+        JSR DrawDeltaFrame  ; eyes4delta2
+        STA SW_PAGE2
+        JSR BloodWait
+        BCS HaveKey2
+
+; Page 1 - Frame 1
+        JSR Delay
+        LDA #FRAME_EYES_13
+        JSR DrawDeltaFrame  ; eyes1delta3
+        STA SW_PAGE1
+        JSR BloodWait
+        BCS HaveKey2
+
+; Page 2 - Frame 2
+        JSR Delay
+        LDA #FRAME_EYES_24
+        JSR DrawDeltaFrame  ; eyes2delta4
+        STA SW_PAGE2
+        JSR BloodWait
+        BCS HaveKey2
+
+        INC zTimer+0
+        LDA zTimer+0
+        CMP #$3F
+        BNE State8
+
+HaveKey2
         JMP SkipAnim        ; always
 
 
@@ -770,7 +610,7 @@ ZeroPage
 
 ; ==========
 BloodWait
-        LDA #0
+        LDA #$BB
         STA zTimer+1
 _BloodDelay
         LDX KEY
@@ -811,10 +651,11 @@ _Delay2
         RTS
 
 
+;------------------------------------------------------------------------
 ; A = 0/1 which colors: magenta/orange
 ; X = Column
 ; Y = Row
-; ==========
+;------------------------------------------------------------------------
 Draw3Lines
         LDA #0
         ROR
@@ -823,7 +664,7 @@ Draw3Lines
         STX zFullCol
         JSR NextLine
         JSR NextLine
-;       --- fall into
+;       --- NOTE: *intentional* fall into
 NextLine
         LDX zFullCol
         LDY zTempRow
@@ -844,9 +685,10 @@ PutColor
         INC zTempRow
         RTS
 
+;------------------------------------------------------------------------
 ; A=Byte
 ; Y=Column
-; ==========
+;------------------------------------------------------------------------
 PutHgrCol
         TAX     ; push color
         TYA     ; a = col/2
@@ -926,29 +768,29 @@ GetHgrY
         RTS
 
 
+;------------------------------------------------------------------------
 ; Drawm Sprite -- uses data for x,y
 ; Input:
 ;   X=ho 16-bit address Source Sprite Data
 ;   Y=lo 16-bit address Source Sprite Data
-;========================================================================
+;------------------------------------------------------------------------
 DrawSprite
         STA SW_AUXWROFF     ; Write MAIN
         JSR InitSpritePtr
 
         JSR GetSpriteData   ; DstX
-        STX zDstX
+        STA zDstX
 
         JSR GetSpriteData   ; DstY
-        STX zSpriteY
+        STA zSpriteY
 
         JSR GetSpriteData   ; SrcW
-        TXA
         CLC
         ADC zDstX
         STA zSpriteW        ; end col
 
         JSR GetSpriteData   ; SrcH
-        STX zSpriteH
+        STA zSpriteH
 
 LoadRows
         LDY zSpriteY        ; Y -> Dest Address
@@ -967,6 +809,7 @@ LoadRows
         STA GBAS2+0
 LoadCols
         JSR GetSpriteData   ; EASTER EGG: place after "SW_AUXWROFF+1 OddCol" for psychodelic zoom
+        TAX                 ; push byte
 
         TYA                 ; restore x-col
         CLC
@@ -974,7 +817,7 @@ LoadCols
         BCS OddCol
         STA SW_AUXWROFF+1   ; Write AUX (even)
 OddCol
-        TXA
+        TXA                 ; pop byte
         STA (GBASL)         ; *** 65C02 *** Write to AUX or MAIN
         STA SW_AUXWROFF     ; Write MAIN (odd)
 
@@ -995,85 +838,117 @@ SpriteDelay
         BNE LoadRows
         RTS
 
-; --- Sprite ---
-
+;------------------------------------------------------------------------
+; --- Compile Array of Delta Frames to Memory ---
+;------------------------------------------------------------------------
 ; IN:
-;   X=hi 16-bit address Source Sprite Data
-;   Y=lo 16-bit address Source Sprite Data
+;   X=ho 16-bit address Table of Delta Frames to Compile
+;   Y=lo 16-bit address Table of Delta Frames to Compile
+; SEE:
+;   TableDeltaAuxInit
+;   TableDeltaMainInit
+; FORMAT:
+;       <destination page>
+;       <$18> or <$38>  ; 6502 code; C=WriteToAuxMem?
+;       <$addr>+        ; source address of packed delta frame
+;       <$0000>         ; end of data
 ;------------------------------------------------------------------------
-InitSpritePtr
-        STX _SpritePtr+2    ; *** SELF-MODIFES vvv
-        STY _SpritePtr+1    ; *** SELF-MODIFES vvv
-        RTS
+TableUnpack
+        STX TableGetByteX+2  ; SELF-MODIFYING vvv
+        STY TableGetByteX+1  ; SELF-MODIFYING vvv
 
-; OUT: X=Byte
-;------------------------------------------------------------------------
-GetSpriteData
-_SpritePtr
-        LDX $C0DE            ; *** SELF-MODIFIED ^^^
-IncSpriteData
-        INC _SpritePtr+1
-        BNE SamePage
-        INC _SpritePtr+2
-SamePage
-        RTS
+        LDX #0
+        JSR TableGetByteX
+        TAX
+        LDY #$00            ; page aligned
+        JSR SetCompiledFrameDeltaAddr   ; X=Hi, Y=Lo
 
+        JSR TableGetByte    ; Get dest addr for compiled delta framec
+        STA TableAuxOrMain  ;     SELF-MODIFIED vv
+
+TableNextFrame
+        JSR TableGetByte    ;     lo source addr
+        TAY                 ; Y=DeltaFrame Source Lo
+        JSR TableGetByte    ;     hi source addr
+        TAX                 ; X=DeltaFrame Source Hi
+        BEQ TableDone       ;     hi byte == 0 --> end of data
+
+TableAuxOrMain
+        SEC                 ;     SELF-MODIFIED ^^
+        LDA zSpriteNext     ; A=DeltaFrame enum
+        JSR CompileDeltaFrame
+        STA SW_AUXWROFF     ;
+
+    DO CONFIG_DEBUG
+
+        INC $400            ; DEBUG: Visually tell what frame delta we are compiling
+    FIN
+        INC zSpriteNext
+        BNE TableNextFrame  ; always
+
+TableGetByte
+        LDX #0
+TableGetByteX
+        LDA $da1a,X         ; SELF-MODIFIED ^^^
+        INX
+        STX TableGetByte+1
+TableDone
+        RTS
 
 
 ;========================================================================
-InitMemCopy
-            LDX #_EndCopy - _MemCopy - 1
-_InitMemCopy
-            LDA _MemCopy,X
-            STA zMemCopy,X
-            DEX
-            BPL _InitMemCopy
-            INX                     ; LDX #0 for zMemCopy
-            JMP $0000 + zMemCopy    ; Work around Merlin32 BUG: JMP $zp -> JMP $0000 + zMemCopy
-
-; Assumes X=0 on entry!
-_MemCopy                        ; Run from ZP! -> zMemCopy
-
-; Copy up "forward"
-;_MovSrc     LDA __reloc_src,X   ; 00E0: *** SELF-MODIFIED = 1D7C
-;_MovDst     STA __reloc_dst,X   ; 00E3: *** SELF-MODIFIED = 6000
-;            INX                 ; 00E6:
-;            BNE _MovSrc         ; 00E7:
-;           INC MoveSrc+1       ; 00E9:
-;           INC MoveDst+1       ; 00EB:
-;           LDA MoveSrc+1       ; 00ED:
-;           CMP #>__end         ; 00EF: assumes aligned to end of page
-
-; Copy "down" reverse
-_MovSrc     LDA __reloc_len,X   ; 00E0: *** SELF-MODIFIED = $9258
-_MovDst     STA __end,X         ; 00E3: *** SELF-MODIFIED = 
-            INX                 ; 00E6:
-            BNE _MovSrc         ; 00E7:
-            DEC MoveSrc+1       ; 00E9:
-            DEC MoveDst+1       ; 00EB:
-            LDA MoveSrc+1       ; 00ED:
-            CMP #>__reloc_src   ; 00EF: assumes aligned to end of page
-
-            BNE _MovSrc         ; 00F1:
-            RTS                 ; 00F3:
-_EndCopy
-
-
-
-
-; IN:
-;   X: index in array of function pointers
+        DS \,0                  ; wastes bytes -- align $C00
 ;========================================================================
-DrawCompiledSprite
-        LDA SPRITE_FUNC+0,X
-        LDY SPRITE_FUNC+1,X
-        STA Trampoline+1    ; *** SELF-MODIFYING vvv
-        STY Trampoline+2    ; *** SELF-MODIFYING vvv
-Trampoline
-        JMP $c0de           ; *** SELF-MODIFIED ^^^
+
+; Move @ -> $0200 Software Keyboard Buffer = SpriteLogo_RELOC
+_sprite_logo_beg = *
+
+SpriteLogo  PUTBIN logo.sprite
+
+_sprite_logo_end  = *
+_sprite_logo_len  = _sprite_logo_end - _sprite_logo_beg
+
+;========================================================================
+        DS \,0                  ; wastes bytes -- align $D00
+;========================================================================
+
+; Move @ -> $D000 LC Bank 2 = SpriteTitle_RELOC
+_sprite_title_beg = *
+
+SpriteTitle PUTBIN title.sprite
+
+_sprite_title_end  = *
+_sprite_title_len  = _sprite_title_end - _sprite_title_beg
+
+;========================================================================
 
 
+; Where to compile delta frames to
+; Everything that fits into AUX memory
+TableDeltaAuxInit
+        db $60                  ; DST = $6000
+        SEC                     ; AUX memory
+        dw frame1delta0         ; NOTE: *MUST* keep in SYNC TableDeltaAuxInit and FRAME_BLOOD_*
+        dw frame2delta0
+        dw blood1delta3
+        dw blood2delta4
+        dw blood3delta1
+        dw blood4delta2
+        dw crown1delta3
+        dw crown2delta4
+        dw crown3delta1
+        dw crown4delta2
+        dw 0                    ; end-of-data
 
+; Everything that fits into MAIN memory
+TableDeltaMainInit
+        db >__code_end+256      ; DST = $7B00
+        CLC                     ; MAIN mem
+        dw eye1delta3
+        dw eye2delta4
+        dw eye3delta1
+        dw eye4delta2
+        dw 0                    ; end-of-data
 
 ;========================================================================
 
@@ -1094,7 +969,6 @@ blood2delta4 use blood24.s
 blood3delta1 use blood31.s
 blood4delta2 use blood42.s
 
-    DO CROWN_EYES
 crown1delta3 use crown13.s
 crown2delta4 use crown24.s
 crown3delta1 use crown31.s
@@ -1104,146 +978,32 @@ eye1delta3   use eyes13.s
 eye2delta4   use eyes24.s
 eye3delta1   use eyes31.s
 eye4delta2   use eyes42.s
-    FIN
 
-;========================================================================
-; IN:
-;   A=sprite index
-;   X=hi 16-bit address Source Sprite Data
-;   Y=lo 16-bit address Source Sprite Data
-; OUT:
-;   SPRITE_FUNC[ A ] = address of dest compiled sprite code
-;
-; DATA:
-;   <base>                  ; page $20 or $40
-;   [
-;       <span>              ; bytes on page base + M
-;       [
-;           <byte1,addr1>,
-;           ...,
-;           <byteN,addrN>
-;       ]                   ; repeated N times
-;   ]                       ; repeated M times
-;
-; Defaults to AUX $base
-;   span = 0 end-of-data
-;   span < 0 switch to writing to MAIN
-;========================================================================
-CompileSprite
-            JSR InitSpritePtr
-
-; Build Array of Function Pointers
-; aFuncs[ nFuncs++ ] = next emit address
-            TAX
-            LDA EmitByteImm+1
-            STA SPRITE_FUNC+0,X
-            LDA EmitByteImm+2
-            STA SPRITE_FUNC+1,X
-
-; Sprites defaults to writing to aux mem
-SpriteAux
-            LDA #$05            ; STA $C005 ; AUXWRON
-            JSR EmitAuxMain
-
-            JSR GetSpriteData   ; <base>
-            STX zSpritePage
-            STX zSpriteTemp
-
-_CompileSprite
-            JSR GetSpriteData   ; X = <num_delta_bytes_this_page>
-            TXA
-            TAY
-            BEQ _CompileDone
-            BPL SpriteSpan
-SpriteMain
-            AND #$7F            ; delta_bytes_this_page has sign bit set to signal switch writing from aux memory to main memory for sprite data
-            TAY
-
-            LDA #$04            ; STA $C004 ; AUXWROFF
-            JSR EmitAuxMain
-
-            LDA zSpriteTemp     ; reset to start of page
-            STA zSpritePage
-
-; --- y = # of spans ---
-SpriteSpan
-            JSR EmitByteA9
-            JSR GetSpriteData
-            JSR EmitByteImm
-
-            JSR EmitByte8D      ; STA $abs
-            JSR GetSpriteData
-            JSR EmitByteImm
-            LDX zSpritePage
-            JSR EmitByteImm
-
-            DEY
-            BNE SpriteSpan
-
-            INC zSpritePage
-            BNE _CompileSprite  ; allways -- sprite never writes to page $00
-_CompileDone
-            LDX #$60            ; RTS
-            BNE EmitByteImm     ; always -- NOTE: *intentional* fall into EmitByteImm
-
-; IN:
-;    A=04 -> $C004 ; AUXWROFF
-;    A=05 -> $C005 ; AUXWRON
-;========================================================================
-EmitAuxMain
-            JSR EmitByte8D
-            TAX                 ; STA $C005 ; AUXWRON
-            JSR EmitByteImm     ; STA $C004 ; AUXWROFF
-            LDX #$C0
-;           JSR EmitByte        ; NOTE: *intentional* fall into EmitByteImm
-            DB  $2C             ; bit $abs -- SKIP NEXT instruction!
-EmitByteA9  LDX #$A9            ; LDA #imm
-            DB  $2C             ; bit $abs -- SKIP NEXT instruction!
-EmitByte8D  LDX #$8D            ; STA $abs
-EmitByteImm
-            STX $c0de           ; *** SELF-MODIFIED ^^^vvv
-            INC  EmitByteImm+1  ; *** SELF-MODIFIED    ^^^
-            BNE _EmitSamePage
-            INC  EmitByteImm+2  ; *** SELF-MODIFIED    ^^^
-_EmitSamePage
-            RTS
-
-; Set address of generated code for next compiled sprite
-; IN:
-;   A=sprite index
-;   X=hi 16-bit address Dest Sprite Code
-;   Y=lo 16-bit address Dest Sprite Code
-;========================================================================
-InitCompileSpriteDest
-            STX EmitByteImm+2   ; *** SELF-MODIFIES vvv
-            STY EmitByteImm+1   ; *** SELF-MODIFIES vvv
-            RTS
-
-;========================================================================
+;------------------------------------------------------------------------
 ; Instead of wasting 2 disk sectors for the HGR Y low and high tables
 ; dynamically build them at run-time.
 ;
-; Size: $60 bytes
+; Size: $53 bytes
 ;
 ; Output:
 ;    aHgrYLo     = $200
 ;    aHgrYHi     = $300
-;========================================================================
+;------------------------------------------------------------------------
 MakeHgrTables
 
 MakeHgrLo
             LDX #$0             ; [00]..[3F]
-            TXA
+            TXA                 ; src = $2000
             JSR MakeHgrLoTriad
             JSR MakeHgrLoTriad
 
             LDX #$40            ; [40..7F]
-            LDA #$28
+            LDA #$28            ; src = $2028
             JSR MakeHgrLoTriad
             JSR MakeHgrLoTriad
 
             LDX #$80            ; [80..BF]
-            LDA #$50
+            LDA #$50            ; src = $2050
             JSR MakeHgrLoTriad
             JSR MakeHgrLoTriad
 
@@ -1289,38 +1049,6 @@ _LoTriad
             RTS
 
 
-;========================================================================
-
-            DS \,0
-_sprite_logo_beg = *
-
-; Move @ -> $0100 Stack = SpriteLogo_RELOC
-SpriteLogo  PUTBIN logo.sprite
-
-; ------------------------------------------------------------------------
-
-            DS \,0
-_sprite_logo_end  = *
-_sprite_logo_len  = _sprite_logo_end - _sprite_logo_beg
-_sprite_title_beg = *
-
-; Move @ -> $D000 LC Bank 1 = SpriteTitle_RELOC
-SpriteTitle PUTBIN title.sprite
-
-; ------------------------------------------------------------------------
-
-_sprite_title_end  = *
-_sprite_title_len  = _sprite_title_end - _sprite_title_beg
-
-;========================================================================
-
-; Data at $6100
-Crown1      PUTBIN crown1.sprite
-Crown2      PUTBIN crown2.sprite
-
-__code_end  = *
-
-
 ;------------------------------------------------------------------------
 ; Can't use MOVE = $FE2C to write to LC Bank 1/2
 ; IN:
@@ -1328,26 +1056,303 @@ __code_end  = *
 ;   Y=Dst Page
 ;   A=Len Page
 ;------------------------------------------------------------------------
-MoveSprite
-            STX _MoveSrc+2  ; *** SELF-MODIFIES vvv     = Src Hi
-            STY _MoveDst+2  ; *** SELF-MODIFIES     vvv = Dst Hi
-            TAY
-_MovePage
-            LDX #0
-_MoveSrc    LDA $DA00,X     ; *** SELF-MODIFIED ***
-_MoveDst    STA $DA00,X     ; *** SELF-MODIFIED     ***
-            INX
-            BNE _MoveSrc
-            INC _MoveSrc+2  ; *** SELF-MODIFIES ^^^
-            INC _MoveDst+2  ; *** SELF-MODIFIES     ^^^
-            DEY             ; Next Page
-            BNE _MovePage
+MemMoveLC
+            STX _MoveSrc+2      ; 0038: *** SELF-MODIFIES vvv     = Src Hi
+            STY _MoveDst+2      ; 003A: *** SELF-MODIFIES     vvv = Dst Hi
+            TAY                 ; 003C:
+_MovePage   LDX #0              ; 003D:
+_MoveSrc    LDA $DA00,X         ; 003F: *** SELF-MODIFIED ***
+_MoveDst    STA $DA00,X         ; 0042: *** SELF-MODIFIED     ***
+            INX                 ; 0045:
+            BNE _MoveSrc        ; 0046:
+            INC _MoveSrc+2      ; 0048: *** SELF-MODIFIES ^^^
+            INC _MoveDst+2      ; 004A: *** SELF-MODIFIES     ^^^
+            DEY                 ; 004C: Next Page
+            BNE _MovePage       ; 004D:
+            RTS                 ; 004F:
+
+
+Init
+            STA SW_AUXWROFF
+            STA SETSTDZP
+
+            STA GR+1        ; TEXT
+            STA SW_PAGE1    ; Page 1
+            STA $C00C       ; 40-col
             RTS
 
+; === Data at $6000 ===
+            DS \,0
+Crown1      PUTBIN crown1.sprite
+Crown2      PUTBIN crown2.sprite
 
+__code_end  = *
+
+;========================================================================
+;=== ZP Segment ===
+;========================================================================
+
+__code_zp_src   = *
+__reloc_zp_dst  = _NUM_FRAME*2
+            ORG __reloc_zp_dst  ; *** Code resides on ZP to minimize address field 1 bytes $ZP instead of 2 bytes $ABS
+
+; IN:
+;  A = Which Delta Frame to Draw, FRAME_*
+;      SEE: CompileDeltaFrame
+;------------------------------------------------------------------------
+DrawDeltaFrame
+            ASL
+            TAX
+            LDA aFrameFunc+0,X  ; low byte odd?
+            LSR
+            BCC _FrameMainMem1
+            ORA #$80            ; yes, C=1
+_FrameMainMem1
+            ASL
+;           BCC _FrameMainMem2
+;           STA SW_AUXWRON      ; C=1
+_FrameMainMem2
+            STA CallFrame+1
+            LDA aFrameFunc+1,X
+            STA CallFrame+2
+            BCC _FrameMainMem3  ; C=1, call func in AUX mem
+            STA SW_AUXRDON
+_FrameMainMem3
+CallFrame
+            JSR $c0de
+            STA SW_AUXRDOFF
+            RTS
+
+;------------------------------------------------------------------------
+; IN:
+;   X=hi 16-bit address Source Sprite Data
+;   Y=lo 16-bit address Source Sprite Data
+;------------------------------------------------------------------------
+InitSpritePtr
+            STX _SpritePtr+2    ; 0050: *** SELF-MODIFES vvv
+            STY _SpritePtr+1    ; 0052: *** SELF-MODIFES vvv
+            RTS                 ; 0054:
+
+;------------------------------------------------------------------------
+; OUT:
+;   A=Byte
+; NOTES:
+;   Source Address is auto incremented accounting for page crosses
+;------------------------------------------------------------------------
+GetSpriteData
+_SpritePtr
+            LDA $C0DE               ; 0055: *** SELF-MODIFIED ^^^
+IncSpriteData                       ; 0058:
+            INC _SpritePtr+1        ; 0058:
+            BNE SpriteDataSamePage  ; 005A:
+            INC _SpritePtr+2        ; 005C:
+SpriteDataSamePage                  ; 005E:
+            RTS                     ; 005E:
+
+;------------------------------------------------------------------------
+; IN:
+;   A=frame index, see FRAME_BLOOD_*
+;   X=hi 16-bit address Source Sprite Data
+;   Y=lo 16-bit address Source Sprite Data
+;   C=0 Main memory
+;     1 Aux memory
+; OUT:
+;   aFrameFunc[ A ] = address of compiled delta frame code
+;
+; DATA:
+;   <base>                  ; page $20 or $40
+;   [
+;       <span>              ; bytes on page base + M
+;       [
+;           <byte1,addr1>,
+;           ...,
+;           <byteN,addrN>
+;       ]                   ; repeated N times
+;   ]                       ; repeated M times
+;
+; Defaults to AUX $base
+;   span = 0 end-of-data
+;   span < 0 switch to writing to MAIN
+;
+;------------------------------------------------------------------------
+;
+; ***NOTE***
+;
+; All writes to variables MUST be on ZP
+; since we may be writing to AUX memory
+; for the compiled delta frame code generated at run-time
+;
+; ***NOTE***
+;
+; You _probably_ want to turn of writes to AUX memory
+; after calling!
+;
+;           STA SW_AUXWROFF
+;
+;------------------------------------------------------------------------
+CompileDeltaFrame
+            JSR InitSpritePtr       ; free up X & Y asap
+            LDY #0                  ; default to writing MAIN mem
+            STA SW_AUXWROFF         ;
+            BCC CompileFrameMainMem ;
+            INY                     ;
+            STA SW_AUXWRON          ; switch to writing AUX mem
+CompileFrameMainMem                 ;
+            STY CompileMemType+1    ;
+
+; Build Array of Function Pointers
+; aFuncs[ nFuncs++ ] = next emit address
+            ASL                     ; A < 0 -> C=0; OPT: could be removed if enum*2
+            TAX                     ;
+            LDA EmitByteImm+1       ;
+CompileMemType
+            ADC #0                  ; SELF-MODIFIED ^ ADC #0 MAIN mem or ADC #1 AUX mem
+            STA aFrameFunc +0,X     ;
+            LDA EmitByteImm+2       ;
+            STA aFrameFunc +1,X     ;
+
+; Sprites defaults to writing to aux mem
+SpriteAux
+            LDA #$05            ; STA $C005 ; AUXWRON
+            JSR EmitAuxMain     ;
+
+            JSR GetSpriteData   ; <base>
+            STA FramePage+1     ; SELF-MODIFYING v
+            STA zFramePage      ;
+
+CompileSprite
+            JSR GetSpriteData   ; A = <num_delta_bytes_this_page>
+
+            LDX _SpritePtr   +1 ; low addr
+            STX _SrcFrameAdr1+1 ; SELF-MODIFYING vv
+            STX _SrcFrameAdr2+1 ; SELF-MODIFYING vv
+
+            LDX _SpritePtr   +2 ; high addr
+            STX _SrcFrameAdr1+2 ; SELF-MODIFYING vvv
+            STX _SrcFrameAdr2+2 ; SELF-MODIFYING vvv
+            LDX #0              ; spanoffset = 0
+
+            TAY                 ; if pos, save length
+            BEQ CompileDone
+            BPL SpriteSpan
+
+; Handle case of no changes bytes on this page
+            ASL
+            BMI UpdateSamePage  ; Force next page
+SpriteMain
+            TYA
+            AND #$7F            ; delta_bytes_this_page has sign bit set to signal switch writing from aux memory to main memory for sprite data
+            TAY                 ; made pos, save length
+
+            LDA #$04            ; STA $C004 ; AUXWROFF
+            JSR EmitAuxMain
+
+            LDA zFramePage      ; reset to start of page
+            STA FramePage+1     ; SELF-MODIFYING vv
+
+; --- y = # of spans ---
+SpriteSpan
+            JSR EmitByteA9
+;           JSR GetSpriteData   ; OPT: Inlined
+_SrcFrameAdr1
+            LDA $da1a,X         ; SELF-MODIFIED ^^ spanoffset[ x++ ]
+            INX
+            JSR EmitByteImm
+
+            JSR EmitByte8D      ; STA $abs
+;           JSR GetSpriteData   ; OPT: Inline
+_SrcFrameAdr2
+            LDA $da1a,X         ; 00AF SELF-MODIFIED ^^^ spanoffset[ x++ ]
+            INX                 ; 00B2
+            JSR EmitByteImm     ; 00B3
+FramePage
+            LDA #0              ; 00B6 SELF-MODIFIED ^v
+            JSR EmitByteImm     ; 00B8
+            DEY                 ; 00BB
+            BNE SpriteSpan      ; 00BC
+
+; Sync X back to Source Pointer += X
+            TXA                 ; 00BE
+            CLC
+            ADC _SpritePtr+1    ; 00BF
+            STA _SpritePtr+1    ; 00C1
+            BCC UpdateSamePage  ; 00C3
+            INC _SpritePtr+2    ; 00C5
+UpdateSamePage                  ; 00C7
+            INC FramePage+1     ; 00C7 SELF-MODIFYING ^
+            BNE CompileSprite   ; 00C9 allways -- sprite never writes to page $00
+
+; Normally we would check after the 1st RTS
+; if we end up on an odd address then
+; we would emit an extra RTS to force the next address to be even
+;     dst = $BE00: 60
+;     dst = $BE01: 60
+;           LDA #$60            ; RTS
+;           JSR EmitByteImm     ; always -- NOTE: *intentional* fall into EmitByteImm
+;           LDA EmitByteImm+1   ; Align to 2 byte boundary
+;           AND #1              ; since odd address is a flag that code is in AUX mem
+;           BEQ _SpriteAlign2   ;
+;           LDA #60             ;
+;           BNE EmitByteImm     ;
+;_SpriteAlign2                  ;
+;           RTS                 ;
+; Instead we check if the address is even and thus we know
+; that we need to emit two RTS instead of just one
+
+CompileDone
+            LDA EmitByteImm+1   ; 00CB low addr
+            LSR                 ; 00CD C= isAddrOdd?
+            BCS EmitByte60      ; 00CE C=1 after emit next addr will be even thus only need single RTS
+            JSR EmitByte60      ; 00D0
+EmitByte60  LDA #$60            ; 00D3 RTS
+            BNE EmitByteImm     ; 00D5 always
+
+; Compile Delta Frame Data -> Code
+zFramePage  db 0                ; 00D7: Which DHGR page the compiled frame writes to $20
+zSpriteNext db 0                ; 00D8: Array of Function Pointers, next address to write to
+
+;------------------------------------------------------------------------
+; Set address of generated code for next compiled sprite
+; IN:
+;   A=sprite index
+;   X=hi 16-bit address Dest Sprite Code
+;   Y=lo 16-bit address Dest Sprite Code
+;------------------------------------------------------------------------
+SetCompiledFrameDeltaAddr
+            STX EmitByteImm+2   ; 00D9: *** SELF-MODIFIES vvv
+            STY EmitByteImm+1   ; 00DB: *** SELF-MODIFIES vvv
+            RTS                 ; 00DD:
+
+;------------------------------------------------------------------------
+; IN:
+;    A=04 -> emit STA $C004 ; AUXWROFF
+;    A=05 -> emit STA $C005 ; AUXWRON
+;------------------------------------------------------------------------
+EmitAuxMain
+            PHA                 ; 00E5
+            JSR EmitByte8D      ; 00E6
+            PLA                 ; 00E9
+            JSR EmitByteImm     ; 00EA STA $C004 ; AUXWROFF
+            LDA #$C0            ; 00ED
+;           JSR EmitByte        ;      NOTE: *intentional* fall into EmitByteImm
+            DB  $2C             ; 00EF bit $abs -- SKIP NEXT instruction!
+EmitByteA9  LDA #$A9            ; 00F0 LDA #imm
+            DB  $2C             ; 00F2 bit $abs -- SKIP NEXT instruction!
+EmitByte8D  LDA #$8D            ; 00F3 STA $abs -- NOTE: *intentional* fall into EmitByteImm
+EmitByteImm STA $c0de           ; 00F5 *** SELF-MODIFIED ^^^vvv
+            INC  EmitByteImm+1  ; 00F8 *** SELF-MODIFIED    ^^^
+            BNE _EmitSamePage   ; 00FA
+            INC  EmitByteImm+2  ; 00FC *** SELF-MODIFIED    ^^^
+_EmitSamePage                   ; 00FE
+            RTS                 ; 00FE
+
+;========================================================================
 
 __reloc_end = *
 __reloc_len = __reloc_end - __reloc_dst
 __end       = __reloc_len + __reloc_src
 __base      = __reloc_len - __reloc_src
+
+            ORG
+__zerppage_end  = *
 

@@ -9,11 +9,11 @@
             db $30, $AF
             db $00, $EF
         db   6              ; Spans @ $41xx
-            db $08, $47
+            db $60, $47
             db $00, $6F
-            db $08, $AF
+            db $60, $AF
             db $00, $C7
-            db $04, $D7
+            db $70, $D7
             db $00, $EF
         db   2              ; Spans @ $42xx
             db $60, $57
@@ -22,7 +22,7 @@
             db $00, $2F
             db $20, $47
             db $20, $6F
-            db $08, $C7
+            db $62, $C7
         db   5              ; Spans @ $44xx
             db $03, $2F
             db $08, $58
@@ -30,11 +30,11 @@
             db $0C, $C8
             db $00, $EF
         db   5              ; Spans @ $45xx
-            db $08, $47
+            db $20, $47
             db $00, $6F
-            db $08, $AF
+            db $60, $AF
             db $00, $C7
-            db $08, $D7
+            db $20, $D7
         db   2              ; Spans @ $46xx
             db $60, $57
             db $00, $AF
@@ -42,7 +42,7 @@
             db $00, $2F
             db $20, $47
             db $60, $6F
-            db $08, $C7
+            db $22, $C7
         db   4              ; Spans @ $48xx
             db $01, $2F
             db $00, $AF
@@ -51,7 +51,7 @@
         db   5              ; Spans @ $49xx
             db $20, $47
             db $00, $6F
-            db $08, $AF
+            db $60, $AF
             db $00, $C7
             db $08, $D8
         db   2              ; Spans @ $4Axx
@@ -60,25 +60,25 @@
         db   3              ; Spans @ $4Bxx
             db $20, $47
             db $60, $6F
-            db $08, $C7
+            db $20, $C7
         db   4              ; Spans @ $4Cxx
-            db $03, $2E
+            db $00, $2E
             db $00, $AF
             db $08, $C8
             db $00, $EF
         db   5              ; Spans @ $4Dxx
             db $00, $47
             db $00, $6F
-            db $08, $AF
+            db $60, $AF
             db $00, $C7
-            db $08, $D7
+            db $20, $D7
         db   3              ; Spans @ $4Exx
             db $08, $58
             db $00, $AF
             db $20, $C7
         db   2              ; Spans @ $4Fxx
             db $20, $47
-            db $08, $C7
+            db $20, $C7
         db   5              ; Spans @ $50xx
             db $03, $2F
             db $00, $AF
@@ -88,7 +88,7 @@
         db   5              ; Spans @ $51xx
             db $00, $47
             db $00, $6F
-            db $08, $AF
+            db $60, $AF
             db $00, $C7
             db $20, $D7
         db   3              ; Spans @ $52xx
@@ -96,18 +96,18 @@
             db $20, $C7
             db $20, $EF
         db   2              ; Spans @ $53xx
-            db $08, $47
+            db $20, $47
             db $08, $B0
         db   4              ; Spans @ $54xx
             db $01, $2F
-            db $08, $C7
+            db $20, $C7
             db $08, $D8
             db $00, $EF
         db   6              ; Spans @ $55xx
             db $08, $30
             db $00, $47
             db $00, $6F
-            db $08, $AF
+            db $60, $AF
             db $00, $C7
             db $60, $D7
         db   4              ; Spans @ $56xx
@@ -116,20 +116,20 @@
             db $00, $D8
             db $20, $EF
         db   2              ; Spans @ $57xx
-            db $08, $47
+            db $22, $47
             db $08, $B0
         db   5              ; Spans @ $58xx
             db $13, $2F
             db $00, $6F
-            db $08, $C7
+            db $60, $C7
             db $09, $D8
             db $00, $EF
         db   7              ; Spans @ $59xx
-            db $08, $2F
+            db $20, $2F
             db $00, $47
             db $20, $57
             db $00, $6F
-            db $08, $AF
+            db $20, $AF
             db $00, $C7
             db $60, $D7
         db   4              ; Spans @ $5Axx
@@ -138,14 +138,14 @@
             db $00, $D8
             db $20, $EF
         db   2              ; Spans @ $5Bxx
-            db $08, $47
+            db $62, $47
             db $08, $B0
         db   3              ; Spans @ $5Cxx
             db $00, $6F
             db $60, $C7
             db $00, $EF
         db   6              ; Spans @ $5Dxx
-            db $08, $2F
+            db $20, $2F
             db $00, $47
             db $60, $57
             db $00, $6F
@@ -158,12 +158,12 @@
             db $00, $D8
             db $20, $EF
         db   2              ; Spans @ $5Fxx
-            db $09, $47
+            db $62, $47
             db $08, $B0
 ; === Main ===
         db   4 + $80        ; Spans @ $40xx
             db $7E, $57
-            db $02, $AE
+            db $00, $AE
             db $00, $C8
             db $00, $EF
         db   7              ; Spans @ $41xx
@@ -282,7 +282,7 @@
             db $40, $AF
             db $44, $C7
         db   5              ; Spans @ $54xx
-            db $00, $2E
+            db $10, $2E
             db $00, $6F
             db $44, $C7
             db $4C, $D7
