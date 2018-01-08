@@ -71,13 +71,7 @@ int find_spans( const uint8_t *frame1, const uint8_t *frame2, int base, bool isM
                 !=  frame2[ offset + edge ] )
                 {
                     // New span or continuation of last one?
-                    if( inSpan )
-                    {
-                        aSpanLen[ nSpans-1 ]++;
-                        aSpanOff[ nSpans-1 ] =         offset + edge  ; // key
-                        aSpanVal[ nSpans-1 ] = frame2[ offset + edge ]; // val
-                    }
-                    else
+                    if( !inSpan )
                     {
 #if DEBUG
     printf( "    Found new span @ $%04X:$%02X\n", offset, edge );
