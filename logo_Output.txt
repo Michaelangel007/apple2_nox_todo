@@ -116,11 +116,11 @@
   113 |  1        logo.s    113 | Empty       | 11 |         |    0 | 00/0800               | Main                                                    
   114 |  1        logo.s    114 | Code        | 11 |         |    3 | 00/0800 : 20 8B 5F    |                            JSR     Init                 
   115 |  1        logo.s    115 | Empty       | 11 |         |    0 | 00/0803               |                                                         
-  116 |  1        logo.s    116 | Comment     | 11 |         |    0 | 00/0803               | ; Intentional copy into STACK PAGE!
+  116 |  1        logo.s    116 | Comment     | 11 |         |    0 | 00/0803               | ; Intentional copy common code into ZP!
   117 |  1        logo.s    117 | Code        | 11 |         |    2 | 00/0803 : A2 00       |                            LDX     #0                   ; Copy $100 bytes
   118 |  1        logo.s    118 | Empty       | 11 |         |    0 | 00/0805               | CopyCodeToZP                                            
   119 |  1        logo.s    119 | Code        | 11 |         |    3 | 00/0805 : BD 10 7A    |                            LDA     __code_zp_src,X      ;
-  120 |  1        logo.s    120 | Code        | 11 |         |    2 | 00/0808 : 95 1C       |                            STA     {{$0E}*2},X          ; ZP,X does NOT roll over into STACK Page
+  120 |  1        logo.s    120 | Code        | 11 |         |    2 | 00/0808 : 95 1C       |                            STA     {{$0E}*2},X          ; ZP,X does NOT roll over into STACK Page, but *wraps-around* the ZP
   121 |  1        logo.s    121 | Code        | 11 |         |    1 | 00/080A : E8          |                            INX                          
   122 |  1        logo.s    122 | Code        | 11 |         |    2 | 00/080B : D0 F8       |                            BNE     CopyCodeToZP         
   123 |  1        logo.s    123 | Empty       | 11 |         |    0 | 00/080D               |                                                         

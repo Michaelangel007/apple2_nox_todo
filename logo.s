@@ -113,11 +113,11 @@ LCBANK1     = $C08B ; Bank 1 | Bank 1 | yes
 Main
         JSR Init
 
-; Intentional copy into STACK PAGE!
+; Intentional copy common code into ZP!
         LDX #0                     ; Copy $100 bytes
 CopyCodeToZP
         LDA __code_zp_src ,X       ;
-        STA __reloc_zp_dst,X       ; ZP,X does NOT roll over into STACK Page
+        STA __reloc_zp_dst,X       ; ZP,X does NOT roll over into STACK Page, but *wraps-around* the ZP
         INX
         BNE CopyCodeToZP
 
