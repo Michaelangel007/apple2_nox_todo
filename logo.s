@@ -108,7 +108,7 @@ LCBANK1     = $C08B ; Bank 1 | Bank 1 | yes
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-        ORG $0800
+        ORG $0900   ; $A5 needed for lz4 unpack
 
 Main
         JSR Init
@@ -979,6 +979,22 @@ eye2delta4   use eyes24.s
 eye3delta1   use eyes31.s
 eye4delta2   use eyes42.s
 
+
+; === Data at $6000 ===
+;   DO * < $6000
+;           DS \,0
+;   FIN
+Crown1      PUTBIN crown1.sprite
+Crown2      PUTBIN crown2.sprite
+
+__code_end  = *
+
+;========================================================================
+;=== INIT Segment ===
+;========================================================================
+; Following initialization code
+; is over-written by compiled delta frame code
+
 ;------------------------------------------------------------------------
 ; Instead of wasting 2 disk sectors for the HGR Y low and high tables
 ; dynamically build them at run-time.
@@ -1080,13 +1096,6 @@ Init
             STA SW_PAGE1    ; Page 1
             STA $C00C       ; 40-col
             RTS
-
-; === Data at $6000 ===
-            DS \,0
-Crown1      PUTBIN crown1.sprite
-Crown2      PUTBIN crown2.sprite
-
-__code_end  = *
 
 ;========================================================================
 ;=== ZP Segment ===
