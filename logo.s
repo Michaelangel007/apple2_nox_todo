@@ -1000,10 +1000,10 @@ __code_end  = *
 ; Instead of wasting 2 disk sectors for the HGR Y low and high tables
 ; dynamically build them at run-time.
 ;
-; Size: $53 bytes
+; Size: $53 bytes (83 bytes)
 ;
 ; Output:
-;    aHgrYLo     = $200
+;    aHgrYLo     = $100
 ;    aHgrYHi     = $300
 ;------------------------------------------------------------------------
 MakeHgrTables
@@ -1011,18 +1011,18 @@ MakeHgrTables
 MakeHgrLo
             LDX #$0             ; [00]..[3F]
             TXA                 ; src = $2000
-            JSR MakeHgrLoTriad
-            JSR MakeHgrLoTriad
+            JSR MakeHgrLoTriad  ; A=00
+            JSR MakeHgrLoTriad  ; A=80
 
             LDX #$40            ; [40..7F]
             LDA #$28            ; src = $2028
-            JSR MakeHgrLoTriad
-            JSR MakeHgrLoTriad
+            JSR MakeHgrLoTriad  ; A=28
+            JSR MakeHgrLoTriad  ; A=A8
 
             LDX #$80            ; [80..BF]
             LDA #$50            ; src = $2050
-            JSR MakeHgrLoTriad
-            JSR MakeHgrLoTriad
+            JSR MakeHgrLoTriad  ; A=50
+            JSR MakeHgrLoTriad  ; A=D0
 
 MakeHgrHi                       ; A = $D0
             TYA                 ; Y = $00
