@@ -770,7 +770,7 @@ GetHgrY
 
 
 ;------------------------------------------------------------------------
-; Drawm Sprite -- uses data for x,y
+; Draw Sprite -- uses data for x,y
 ; Input:
 ;   X=ho 16-bit address Source Sprite Data
 ;   Y=lo 16-bit address Source Sprite Data
