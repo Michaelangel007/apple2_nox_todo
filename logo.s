@@ -108,7 +108,8 @@ LCBANK1     = $C08B ; Bank 1 | Bank 1 | yes
 
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-        ORG $0900   ; $A5 needed for lz4 unpack
+                    ; Can't start at $800 since
+        ORG $0900   ; $A5 bytes needed for LZ4 unpack
 
 Main
         JSR Init
