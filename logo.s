@@ -4,6 +4,7 @@
 ; DHGR Screen Difference to Compiled Sprite
 ; Frame Delta
 
+CONFIG_65C02 = 0
 CONFIG_DEBUG = 1
 
 SpriteLogo_RELOC  = $0200 ; $F6 bytes used
@@ -109,7 +110,8 @@ LCBANK1     = $C08B ; Bank 1 | Bank 1 | yes
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
                     ; Can't start at $800 since
-        ORG $0900   ; $A5 bytes needed for LZ4 unpack
+        ORG $08C0   ; $A5 bytes needed for LZ4 unpack
+                    ; If $900, overflows $D00
 
 Main
         JSR Init
@@ -183,7 +185,7 @@ InitTitleSprite
         STY zRow2
 
 ; 560 px 1-bit color
-; 140 px 4-bit color
+; 140 px 3-bit color (Black, Magenta, Green, Orange, Blue, White)
 
 ; Draw Columns -- from middle to out both ends
 ; ==========
@@ -818,8 +820,18 @@ LoadCols
         BCS OddCol
         STA SW_AUXWROFF+1   ; Write AUX (even)
 OddCol
+    DO CONFIG_65C02         ; 65C02 begin
         TXA                 ; pop byte
         STA (GBASL)         ; *** 65C02 *** Write to AUX or MAIN
+    ELSE                    ; 6502 begin
+        TYA
+        PHA
+        TXA
+        LDY #0
+        STA (GBASL),Y
+        PLA
+        TAY                 ; 6502 end
+    FIN
         STA SW_AUXWROFF     ; Write MAIN (odd)
 
         BCC MemSameColumn
